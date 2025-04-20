@@ -1,4 +1,4 @@
-<span style="font-size:20px">**Understanding the Drivers of Fire Frequency and Severity in Toronto: A Data-Driven Approach**</span>
+<span style="font-size:30px">**Understanding the Drivers of Fire Frequency and Severity in Toronto: A Data-Driven Approach**</span>
 
 This project investigates the frequency and severity of fire incidents in Toronto, using data from the City of Toronto's Open Data Portal and weather information from the Open-Meteo Historical Weather API. The goal is to identify when, where, and under what conditions fires are most likely to occur and to assess the factors that contribute to economic losses caused by these incidents.
 
