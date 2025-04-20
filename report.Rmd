@@ -1,0 +1,620 @@
+---
+title: "Understanding the Drivers of Fire Frequency and Severity in Toronto: A Data-Driven Approach"
+author: "Shijun Yu"
+date: "April 30, 2025"
+output:
+  pdf_document: default
+---
+
+# 1 Introduction
+
+## 1.1 Background
+
+Fire incidents pose significant risks to public safety and can result in substantial economic losses. Understanding when and where fires happen, and what might be contributing to their frequency and severity, is essential for prevention, preparedness, and resource planning. Motivated by this broader goal, I decided to explore fire incidents in the city of Toronto using publicly available data from the City of Toronto’s open data portal. This dataset contains key details about each fire, including the alarm time, geographic location, and estimated dollar loss.
+
+My initial curiosity centered around the role of weather conditions. It seemed intuitive that certain environmental factors, such as hot, dry, and windy, might be linked to a greater likelihood or severity of fires. To test this idea, I retrieved historical weather data from the Open-Meteo API. This source provides hourly data on temperature, precipitation, and wind speed, which I matched to the time and location of each fire incident.
+
+However, after conducting some preliminary analysis, I found that the relationship between weather conditions and fire severity wasn’t as strong as I had expected. While weather may play a role, it became evident that other factors, including the time of day, season, and neighborhood, might be more informative. This observation led me to expand my original focus to consider a wider range of variables.
+
+## 1.2 Research Question
+
+To better understand the dynamics of fire incidents in Toronto, I refined my research question to:
+
+"What factors affect the frequency and severity of fires in Toronto?"
+
+To answer this question, I focus on fire incidents with valid location and timestamp data, and I use estimated dollar loss as a proxy for fire severity. Recognizing that variables like dollar loss can be highly skewed, appropriate transformations were applied during the analysis. This project aims to investigate how spatial, temporal, and environmental variables relate to fire occurrence and impact across the city.
+
+# 2 Methods
+
+## 2.1 Data Acquisition
+
+Two primary datasets were used in this analysis:
+
+1. Fire incident dataset was downloaded from the City of Toronto’s Open Data Portal (https://open.toronto.ca/dataset/fire-incidents/). This dataset contains records for fire incidents within Toronto, providing comprehensive details such as the exact date and time of incident, geographical coordinates, and the estimated dollar loss incurred from each incident.
+
+2. Weather dataset was obtained using the Open-Meteo Historical Weather API (https://open-meteo.com/en/docs/historical-weather-api). The Open-Meteo API provides detailed meteorological information including temperature (°C), wind speed (m/s), and precipitation (mm) at an hourly granularity. For each incident, the exact hourly weather conditions matching the incident's alarm hour were fetched using latitude, longitude, and incident date as query parameters.
+
+These two datasets were initially stored as separate tibbles and later merged into a single comprehensive dataset. This final merged dataset contains data from January 2011 to June 2016.
+
+## 2.2 Data Cleaning and Wrangling
+
+Following data acquisition, the merged dataset was first inspected to verify variable structure and data types. Several data type conversions and renaming procedures were conducted for consistency and clarity. Missing values were checked during the inspection, with only one observation containing NA. This incomplete record was removed from the dataset.
+
+After that, several new variables were created to support the analysis of fire frequency and economic impact. A binary DayNight variable was created by splitting incidents into daytime (6AM to 6PM) and nighttime (6PM to 6AM). A Season variable was also created by mapping each incident's month to its corresponding season, along with a labeled Month column for monthly trend analysis.
+
+Exploratory checks of variable distributions were conducted next, using histograms to assess potential skewness. Temperature was approximately normally distributed and required no transformation. However, wind speed exhibited significant right-skewness, prompting a log transformation to achieve a more symmetric distribution suitable for subsequent analysis. Due to the highly skewed nature of precipitation data (predominantly composed of zero values), this numerical variable was converted into a binary categorical variable, indicating the presence or absence of rainfall at the time of the incident. In addition, estimated dollar loss exhibited significant right-skewness, driven by a small number of incidents with extremely high losses. To address this, a log transformation was applied to reduce skewness, improve interpretability, and maintain valuable information regarding incident severity.
+
+Finally, outlier detection and removal were carried out for temperature and log of wind speed using the 1.5*IQR method. These extreme values were safely removed. Conversely, outliers in the log of estimated dollar loss were intentionally retained, recognizing that extreme values in this variable reflect genuinely severe fire incidents critical to the study’s objectives.
+
+After completing these data cleaning and wrangling procedures, the cleaned dataset comprised 9931 rows and 12 columns.
+
+## 2.3 Data Exploration Tools
+
+To investigate the frequency and economic impact of fire incidents in Toronto, a variety of visualizations were created using the cleaned dataset. These visual tools supported the exploration of temporal, spatial, and environmental patterns and provided insight into how various factors may be related to the occurrence and cost of fires.
+
+Environmental Patterns:
+
+To assess whether environmental factors influence how often fires occur, histograms were used to compare fire counts under different temperature and log of wind speed. Additionally, a bar chart was used to compare fire frequency under rainy or non-rainy conditions. These plots allowed for a clear visual comparison of how fire frequency varies under different weather conditions.
+
+Temporal Analysis:
+
+Fire frequency was first examined across temporal dimensions. Bar charts were used to visualize the total number of incidents by season, month, and time of the day. These visualizations helped to reveal how fire frequency changes across time.
+
+Spatial Analysis:
+
+To understand spatial differences in fire occurrence, fire incidents were mapped onto Toronto neighborhoods using a choropleth map. The number of fire incidents was aggregated by neighborhood, and neighborhoods were shaded by total incident count. This visualization highlighted geographic areas with higher or lower fire activity.
+
+Economic Loss Patterns:
+
+To explore the economic impact of fire incidents under different conditions, boxplots were used to compare fire losses across several categorical variables, including time of day, season, month, and precipitation status. These boxplots offered insights into when and under what conditions fires tend to result in greater financial damage.
+
+Numerical Variable Relationships:
+
+To assess relationships among numerical variables, a correlation heatmap was generated to summarize the strength and direction of linear associations between variables such as temperature, log-transformed wind speed, and log-transformed estimated dollar loss. To further explore these relationships visually, scatterplots with fitted linear trend lines were used to visualize the actual form and variability of the associations between continuous predictors and economic loss.
+
+This combination of graphical tools provided a comprehensive exploratory understanding of when, where, and under what conditions fire incidents tend to occur and result in higher economic damage. Insights from this step informed the selection of variables and modeling strategies used in later stages of analysis.
+
+## 2.4 Modeling Approach and Evaluation
+
+The full dataset was randomly split into a training set (70%) and a test set (30%). All transformations, outlier removals, and feature engineering were completed prior to the split to prevent data leakage.
+
+To explore what factors influence how often fires occur, a count-based modeling approach was used. The number of fire incidents was aggregated monthly and modeled using a Generalized Additive Model (GAM) with a Poisson link. Model performance was evaluated using R² on the test set, which measures how well the model explains variation in monthly fire counts.
+
+To model the log-transformed estimated dollar loss, five regression models were trained using the same set of predictors: temperature, log-transformed wind speed, precipitation condition, time of day, month and season. The following models were fit:
+
+1. Pruned Tree (rpart)
+
+- Optimal complexity parameter selected by minimizing cross-validation error
+
+2. Bagging (random forest with mtry = number of predictors)
+
+- Built using the randomForest package with all predictors considered at each split
+
+3. Random Forest (randomForest library)
+
+- Ensemble of decision trees with default mtry value
+
+4. Boosting (gbm via caret)
+
+- 1000 trees
+
+- 10-fold cross-validation
+
+- Best shrinkage value selected from: (0.001, 0.005, 0.01, 0.05, 0.1)
+
+- Fixed interaction depth = 1
+
+- Gaussian error distribution
+
+5. XGBoost (caret)
+
+- 10-fold cross-validation with parallel processing
+
+- Grid search
+
+- max depths: (1, 3, 5)
+
+- number of iterations: (100, 150, ..., 500)
+
+- learning rates: (0.01, 0.05, 0.1)
+
+Each model was trained on the training set and evaluated on the test set using Root Mean Squared Error (RMSE), which provides an interpretable measure of prediction accuracy in the same units as the response variable.
+
+# 3 Results
+
+## 3.1 Exploratory Data Analysis
+
+```{r include=FALSE}
+source("process_project_data.R")
+```
+
+First of all, summary statistics of numeric variables are presented in Table 1 below. These statistics reflect the cleaned and transformed dataset after outlier removal and transformation steps described in the Methods section.
+
+```{r echo=FALSE}
+summary_stats <- tibble(
+  Statistic = c("Min", "Q1", "Median", "Mean", "Q3", "Max"),
+  Temperature = c(
+    min(cleaned_data$Temperature),
+    quantile(cleaned_data$Temperature, 0.25),
+    median(cleaned_data$Temperature),
+    mean(cleaned_data$Temperature),
+    quantile(cleaned_data$Temperature, 0.75),
+    max(cleaned_data$Temperature)
+  ),
+  Wind_Speed_Log = c(
+    min(cleaned_data$Wind_Speed_Log),
+    quantile(cleaned_data$Wind_Speed_Log, 0.25),
+    median(cleaned_data$Wind_Speed_Log),
+    mean(cleaned_data$Wind_Speed_Log),
+    quantile(cleaned_data$Wind_Speed_Log, 0.75),
+    max(cleaned_data$Wind_Speed_Log)
+  ),
+  Estimated_Dollar_Loss_Log = c(
+    min(cleaned_data$Estimated_Dollar_Loss_Log),
+    quantile(cleaned_data$Estimated_Dollar_Loss_Log, 0.25),
+    median(cleaned_data$Estimated_Dollar_Loss_Log),
+    mean(cleaned_data$Estimated_Dollar_Loss_Log),
+    quantile(cleaned_data$Estimated_Dollar_Loss_Log, 0.75),
+    max(cleaned_data$Estimated_Dollar_Loss_Log)
+  )
+)
+
+summary_stats %>%
+  mutate(across(-Statistic, ~ round(.x, 3))) %>%
+  kable(caption = "Summary Statistics of Numeric Variables")
+```
+
+Table 1 reveals that fire incidents occurred across a wide range of temperatures, from -24.6°C to 34.8°C, with a median of 8.9°C. Wind speed, after log transformation, ranged from approximately 0.4m/s to 2.6m/s, with a median of 1.5m/s. The log-transformed estimated dollar loss varied considerably, with a minimum value of 0 and a maximum value of 16.38, indicating substantial variability in fire-related financial damages.
+
+Next, the following Figure 1 shows the frequency of fire incidents by temperature, log-transformed wind speed, and precipitation condition.
+
+```{r echo=FALSE}
+p1 <- ggplot(cleaned_data, aes(x = Temperature)) +
+  geom_histogram(fill = "steelblue", bins = 15, color = "black") +
+  labs(title = "Figure 1: Fire Incident Frequency by Weather Conditions",
+       x = "Temperature (°C)",
+       y = "Number of Incidents") +
+  theme_minimal()
+
+p2 <- ggplot(cleaned_data, aes(x = Wind_Speed_Log)) +
+  geom_histogram(fill = "forestgreen", bins = 15, color = "black") +
+  labs(x = "Log(Wind Speed)",
+       y = "Number of Incidents") +
+  theme_minimal()
+
+p3 <- ggplot(cleaned_data, aes(x = Precipitation_Binary)) +
+  geom_bar(fill = "skyblue", color = "black", width = 0.7) +
+  labs(x = "Precipitation Condition",
+       y = "Number of Incidents") +
+  theme_minimal()
+
+p1 | p2 | p3
+```
+
+Figure 1 indicates that fire incidents occurred across a wide temperature range, with a higher concentration during moderate temperatures. Incidents also clustered around moderate wind speeds when examined on a log-transformed scale, suggesting a relatively normal distribution. Additionally, the majority of fire incidents took place under dry conditions, illustrating that the absence of precipitation may play a role in the increased likelihood of fire occurrences.
+
+Then, in order to explore the temporal characteristics of fire incidents in Toronto, the following Figure 2 was generated to summarize incident frequency across different time dimensions.
+
+```{r echo=FALSE, fig.height=6}
+season_freq <- cleaned_data %>% count(Season)
+month_freq <- cleaned_data %>% count(Month)
+daynight_freq <- cleaned_data %>% count(DayNight)
+
+p1 <- ggplot(season_freq, aes(x = Season, y = n, fill = Season)) +
+  geom_col() +
+  labs(title = "Figure 2: Fire Incident Frequency by Season, Month, and Time of Day",
+       x = "Season",
+       y = "Number of Incidents") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+p2 <- ggplot(month_freq, aes(x = Month, y = n, fill = Month)) +
+  geom_col() +
+  labs(x = "Month",
+       y = "Number of Incidents") +
+  theme_minimal()
+
+p3 <- ggplot(daynight_freq, aes(x = DayNight, y = n, fill = DayNight)) +
+  geom_col() +
+  labs(x = "Time of Day",
+       y = "Number of Incidents") +
+  theme_minimal()
+
+(p1 | p3 ) / p2
+```
+
+As shown in Figure 2, spring experienced the highest number of fire incidents among all seasons, followed by summer and winter, while fall had the fewest. On a monthly scale, May had the greatest number of incidents, while September recorded the lowest. In terms of time of day, daytime incidents were more frequent than nighttime ones. These patterns suggest that temporal variation may play a role in influencing fire frequency, with warmer and more active months such as May potentially leading to increased fire risk.
+
+To understand where fire incidents occur most frequently, each incident was geocoded to a Toronto neighborhood, and the total count of incidents was mapped onto a choropleth. Figure 3 below highlights geographic hot spots, offering insight into how certain neighborhoods may experience more fires (an interactive version of this plot can be found on the website).
+
+```{r echo=FALSE}
+fire_sf <- st_as_sf(cleaned_data, coords = c("Longitude", "Latitude"), crs = 4326)
+toronto_map <- st_transform(toronto_map, crs = 4326)
+
+aggregated_data <- fire_sf %>%
+  st_join(toronto_map, join = st_within) %>%
+  group_by(AREA_NAME) %>%
+  summarise(
+    fire_count = n()
+  ) %>%
+  st_drop_geometry()
+
+toronto_map_filtered <- toronto_map %>%
+  left_join(aggregated_data, by = "AREA_NAME") %>%
+  mutate(
+    fire_count = ifelse(is.na(fire_count), 0, fire_count)
+  )
+
+ggplot(toronto_map_filtered) +
+  geom_sf(aes(fill = fire_count), color = "#444444", size = 0.5) +
+  scale_fill_gradientn(
+    colors = brewer.pal(7, "YlOrRd"),
+    na.value = "white",
+    name = "Number of\nFire Incidents"
+  ) +
+  labs(
+    title = "Figure 3: Choropleth Map of Fire Incident Frequency by Neighborhoods"
+  ) +
+  theme_minimal() +
+  theme(plot.caption = element_text(size = 9, hjust = 0.5))
+```
+
+As shown in Figure 3, several neighborhoods in the northwestern region of Toronto appear to experience notably higher fire frequencies. These spatial disparities suggest that neighborhood-level differences, such as population, building age, or building density, could play an important role in shaping where fires are more likely to occur.
+
+After that, in order to assess patterns in fire severity, log-transformed estimated dollar loss was compared across time of day, season, month, and precipitation condition using boxplots. Figure 4 below highlights when fires tend to result in greater economic damage.
+
+```{r echo=FALSE, fig.height=6}
+p_day <- ggplot(cleaned_data, aes(x = DayNight, y = Estimated_Dollar_Loss_Log, fill = DayNight)) +
+  geom_boxplot() +
+  labs(title = "Figure 4: Log-Transformed Estimated Dollar Loss by Categorical Variables",
+       x = "Time of Day",
+       y = "Log(Estimated Dollar Loss)") +
+  theme_minimal()
+
+p_season <- ggplot(cleaned_data, aes(x = Season, y = Estimated_Dollar_Loss_Log, fill = Season)) +
+  geom_boxplot() +
+  labs(x = "Season",
+       y = "Log(Estimated Dollar Loss)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+p_month <- ggplot(cleaned_data, aes(x = Month, y = Estimated_Dollar_Loss_Log, fill = Month)) +
+  geom_boxplot() +
+  labs(x = "Month",
+       y = "Log(Estimated Dollar Loss)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p_precip <- ggplot(cleaned_data, aes(x = Precipitation_Binary, y = Estimated_Dollar_Loss_Log, fill = Precipitation_Binary)) +
+  geom_boxplot() +
+  labs(x = "Precipitation Condition",
+       y = "Log(Estimated Dollar Loss)") +
+  theme_minimal()
+
+(p_day | p_season) / (p_month | p_precip)
+```
+
+Figure 4 suggests that fire incidents occurring at night generally have slightly higher financial losses compared to those during the day. Seasonal and monthly variations appear modest, though winter shows slightly higher medians. Additionally, incidents that occurred during rainfall tend to be associated with higher losses, indicating a potential link between precipitation condition and fire severity.
+
+Finally, Figure 5 below provides a concise summary of correlations among numerical variables.
+
+```{r echo=FALSE}
+numeric_data <- cleaned_data %>% select(Temperature, Wind_Speed_Log, Estimated_Dollar_Loss_Log)
+correlation_matrix <- cor(numeric_data, use = "complete.obs")
+
+ggcorrplot(correlation_matrix, 
+           lab = TRUE, 
+           title = "Figure 5: Correlation Heatmap of Numerical Variables",
+           colors = c("red", "white", "blue"),  
+           outline.color = "black") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+        axis.text.x = element_text(angle = 30, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10))
+```
+
+As shown in Figure 5, the weak correlations between these numerical variables indicate potential non-linear relationships or interactions that may be explored further.
+
+Thus, the following scatterplots are shown to provide visual insights. Figure 6 illustrates a scatterplot of temperature versus log-transformed estimated dollar loss, showing a weak negative linear relationship.
+
+```{r echo=FALSE, message=FALSE}
+ggplot(cleaned_data, aes(x = Temperature, y = Estimated_Dollar_Loss_Log)) +
+  geom_point(color = "darkorange", alpha = 0.3) +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(title = "Figure 6: Log-Transformed Estimated Dollar Loss vs Temperature",
+       x = "Temperature (°C)",
+       y = "Log(Estimated Dollar Loss)") +
+  theme_minimal()
+```
+
+The summary of this linear model is shown in Table 2. It confirms the previous indication of a weak but statistically significant negative relationship between temperature and log-transformed estimated dollar loss. Specifically, the estimated coefficient for Temperature is approximately -0.012 (p-value < 0.05), suggesting that for each 1°C increase in temperature, the expected log-transformed dollar loss decreases by about 0.012 units. Interpreted on the natural scale, this translates to roughly a 1% decrease in estimated dollar loss per degree Celsius increase.
+
+```{r echo=FALSE}
+model_temp <- lm(Estimated_Dollar_Loss_Log ~ Temperature, data = cleaned_data)
+summary_model_temp <- summary(model_temp)
+coef_table_temp <- as.data.frame(coef(summary_model_temp))
+knitr::kable(coef_table_temp, caption = "Summary Table of First Linear Model", digits = 3)
+```
+
+Similarly, Figure 7 below depicts the relationship between log-transformed wind speed and log-transformed estimated dollar loss, suggesting no strong linear relationship.
+
+```{r echo=FALSE, message=FALSE}
+ggplot(cleaned_data, aes(x = Wind_Speed_Log, y = Estimated_Dollar_Loss_Log)) +
+  geom_point(color = "darkgreen", alpha = 0.3) +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Figure 7: Log-Transformed Estimated Dollar Loss vs Wind Speed",
+       x = "Log(Wind Speed)",
+       y = "Log(Estimated Dollar Loss)") +
+  theme_minimal()
+```
+
+The summary of this linear model is shown in Table 3. In contrast to the previous model, Wind_Speed_Log exhibits a small positive coefficient (approximately 0.021) with a high p-value (0.813), indicating no statistically significant linear relationship between the log-transformed wind speed and the log-transformed estimated dollar loss.
+
+```{r echo=FALSE}
+model_wind <- lm(Estimated_Dollar_Loss_Log ~ Wind_Speed_Log, data = cleaned_data)
+summary_model_wind <- summary(model_wind)
+coef_table_wind <- as.data.frame(coef(summary_model_wind))
+knitr::kable(coef_table_wind, caption = "Summary Table of Second Linear Model", digits = 3)
+```
+
+## 3.2 Modelling Analysis
+
+To begin with, the GAM model was fit to the monthly‐aggregated fire counts in order to quantify the effects suggested by the exploratory analyses. A Poisson‐link GAM was used to allow for smooth, nonlinear effects of average temperature, average log-transformed wind speed, and calendar month (to capture seasonality), while also including categorical terms for season and linear terms for the fractions of rainy and daytime hours. Tables 4–6 below first report the estimated parametric coefficients, then the significance of the smooth terms, and finally the model’s R² on the test set.
+
+```{r echo=FALSE, message=FALSE}
+freq_data <- cleaned_data %>%
+  mutate(YearMonth = floor_date(Incident_Date, "month")) %>%
+  group_by(YearMonth, Month, Season) %>%
+  summarise(
+    Count     = n(),
+    AvgTemp   = mean(Temperature, na.rm = TRUE),
+    AvgWind   = mean(Wind_Speed_Log, na.rm = TRUE),
+    RainyFrac = mean(Precipitation_Binary == "Rain"),
+    DayFrac   = mean(DayNight           == "Day")
+  ) %>%
+  ungroup()
+
+set.seed(123)
+freq_idx   <- createDataPartition(freq_data$Count, p = 0.7, list = FALSE)
+train_freq <- freq_data[freq_idx, ]
+test_freq  <- freq_data[-freq_idx, ]
+
+gam_mod <- gam(
+  Count ~ 
+    s(AvgTemp) + 
+    s(AvgWind) + 
+    Season + 
+    s(as.numeric(Month), bs="cc", k = 12) + 
+    RainyFrac + 
+    DayFrac,
+  family = poisson(link = "log"),
+  data   = train_freq
+)
+
+gam_sum <- summary(gam_mod)
+
+param_df <- as.data.frame(gam_sum$p.table) %>%
+  rownames_to_column(var = "Term") %>%
+  rename(
+    Estimate = Estimate,
+    Std_Error = `Std. Error`,
+    z_value = `z value`,
+    p_value = `Pr(>|z|)`
+  )
+
+smooth_df <- as.data.frame(gam_sum$s.table) %>%
+  rownames_to_column(var = "Smooth") %>%
+  rename(
+    EDF = edf,
+    Ref_df = Ref.df,
+    Chi_sq = `Chi.sq`,
+    p_value = `p-value`
+  )
+
+knitr::kable(
+  param_df,
+  caption = "Parametric Coefficients for the GAM",
+  digits  = 3
+)
+
+knitr::kable(
+  smooth_df,
+  caption = "Smooth Terms for the GAM",
+  digits  = 3
+)
+
+pred_freq <- predict(gam_mod, newdata = test_freq, type = "response")
+R2_freq   <- 1 - sum((test_freq$Count - pred_freq)^2) /
+               sum((test_freq$Count - mean(test_freq$Count))^2)
+
+results_freq <- tibble(
+  Model     = "GAM",
+  R_squared = round(R2_freq, 3)
+)
+
+knitr::kable(
+  results_freq,
+  caption = "Test Set R² for the GAM"
+)
+```
+
+Table 4 shows that, among the parametric terms, only the spring indicator reaches statistical significance (p-value = 0.027), while summer and winter do not differ significantly from the fall baseline; neither the fraction of rainy hours nor the fraction of daytime hours are significant predictors of monthly fire counts. In Table 5, both the temperature spline and the cyclic month spline are highly significant, indicating strong nonlinear effects of average temperature and seasonality on monthly fire frequency, whereas average log‐transformed wind speed does not contribute significantly (p-value = 0.118). Finally, R² = 0.32 (Table 6) indicates that the model explains about one‐third of the variability in monthly fire counts. These results suggest that temperature and seasonal timing are the primary drivers of fire frequency, while wind speed and precipitation pattern play a much smaller role.
+
+After examining the factors influencing the frequency of fire incidents using a GAM, the next stage of analysis focuses on understanding the severity of fire incidents, as measured by the log-transformed estimated dollar loss. To evaluate how well different modeling approaches can predict fire-related economic loss, five machine learning regression models are trained and compared using the same set of predictors (details can be found in section 2.4). Model performance is assessed using RMSE on test set to ensure fair comparison.
+
+```{r echo=FALSE}
+formula_loss <- Estimated_Dollar_Loss_Log ~ Temperature + Wind_Speed_Log +
+                Precipitation_Binary + DayNight + Month + Season
+
+set.seed(123)
+hitters_tree <- rpart(formula_loss, data = train_data, method = "anova", na.action = na.exclude)
+optimal_cp <- hitters_tree$cptable[which.min(hitters_tree$cptable[,"xerror"]), "CP"]
+hitters_tree_pruned <- prune(hitters_tree, cp = optimal_cp)
+```
+
+```{r echo=FALSE}
+predictors <- all.vars(formula_loss)[-1]   
+p <- length(predictors)
+
+set.seed(123)
+bag_hitters <- randomForest(
+  formula_loss, 
+  data       = train_data, 
+  mtry       = p, 
+  importance = TRUE,
+  na.action  = na.exclude
+)
+```
+
+```{r echo=FALSE}
+set.seed(123)
+rf_hitters <- randomForest(
+  formula_loss,
+  data       = train_data,
+  importance = TRUE,
+  na.action  = na.exclude
+)
+```
+
+```{r echo=FALSE}
+set.seed(123)
+shrinkage_vals <- c(0.001, 0.005, 0.01, 0.05, 0.1)
+n_trees <- 1000
+train_rmse <- numeric(length(shrinkage_vals))
+
+for (i in seq_along(shrinkage_vals)) {
+  set.seed(123)
+  gbm_model <- gbm(formula_loss, 
+                   data = train_data, 
+                   distribution = "gaussian",
+                   n.trees = n_trees,
+                   interaction.depth = 1,
+                   shrinkage = shrinkage_vals[i],
+                   bag.fraction = 1,        
+                   train.fraction = 1,  
+                   verbose = FALSE)
+  
+  preds <- predict(gbm_model, newdata = train_data, n.trees = n_trees)
+  train_rmse[i] <- sqrt(mean((preds - train_data$Estimated_Dollar_Loss_Log)^2))
+}
+
+best_index <- which.min(train_rmse)
+best_shrink <- shrinkage_vals[best_index]
+
+set.seed(123)
+best_gbm <- train(
+  formula_loss,
+  data      = train_data,
+  method    = "gbm",
+  trControl = trainControl(method="cv", number=10),
+  tuneGrid  = expand.grid(
+    n.trees           = n_trees,
+    interaction.depth = 1,
+    shrinkage         = best_shrink,
+    n.minobsinnode    = 10
+  ),
+  verbose = FALSE
+)
+```
+
+```{r echo=FALSE, warning=FALSE}
+cl <- makeCluster(8)
+registerDoParallel(cl)
+
+train_ctrl <- trainControl(
+  method = "cv",
+  number = 10,
+  allowParallel = TRUE
+)
+
+tune_grid <- expand.grid(
+  nrounds          = seq(100, 500, by = 50),  
+  max_depth        = c(1, 3, 5),               
+  eta              = c(0.01, 0.05, 0.1),     
+  gamma            = 0,                    
+  colsample_bytree = 1,         
+  min_child_weight = 1,                     
+  subsample        = 1                    
+)
+
+set.seed(123)
+xgb_model <- train(
+  formula_loss, 
+  data       = train_data,
+  method     = "xgbTree",
+  trControl  = train_ctrl,
+  tuneGrid   = tune_grid,
+  metric     = "RMSE",
+  na.action  = na.exclude
+)
+
+stopCluster(cl)
+registerDoSEQ()
+```
+
+```{r echo=FALSE, warning=FALSE}
+pred_tree <- predict(hitters_tree_pruned, newdata = test_data)
+rmse_tree <- sqrt(mean((pred_tree - test_data$Estimated_Dollar_Loss_Log)^2))
+
+pred_bag <- predict(bag_hitters, newdata = test_data)
+rmse_bag <- sqrt(mean((pred_bag - test_data$Estimated_Dollar_Loss_Log)^2))
+
+pred_rf <- predict(rf_hitters, newdata = test_data)
+rmse_rf <- sqrt(mean((pred_rf - test_data$Estimated_Dollar_Loss_Log)^2))
+
+pred_gbm <- predict(best_gbm, newdata = test_data, n.trees = n_trees)
+rmse_gbm <- sqrt(mean((pred_gbm - test_data$Estimated_Dollar_Loss_Log)^2))
+
+pred_xgb <- predict(xgb_model, newdata = test_data)
+rmse_xgb <- sqrt(mean((pred_xgb - test_data$Estimated_Dollar_Loss_Log)^2))
+
+results <- data.frame(
+  Method     = c("Pruned Tree", "Bagging", "Random Forest", "Boosting", "XGBoost"),
+  Test_RMSE  = c(rmse_tree, rmse_bag, rmse_rf, rmse_gbm, rmse_xgb)
+)
+
+kable(
+  results,
+  caption = "Test Set RMSE for All Regression Models",
+  digits  = 3,
+  col.names = c("Model", "RMSE")
+)
+```
+
+Among the five regression models evaluated, XGBoost achieved the lowest test RMSE, indicating the best predictive performance for estimating fire-related economic losses. It slightly outperformed boosting model and pruned tree model, while bagging model showed the highest error. Given XGBoost’s superior accuracy, its variable importance plot is presented in Figure 8 below to highlight the most influential predictors contributing to the model’s performance.
+
+```{r echo=FALSE}
+importance_xgb <- varImp(xgb_model, scale = FALSE)
+plot(importance_xgb, main = "Figure 8: Variable Importance Plot (XGBoost)")
+```
+
+The variable importance plot reveals that temperature and log-transformed wind speed are the two most influential predictors of fire-related economic losses. These are followed by precipitation status and certain month indicator (Month^5). In contrast, some other month indicators don't contribute, as well as the season. Overall, weather conditions appear to play key roles in determining the economic impact of fire incidents in Toronto.
+
+# 4 Conclusions and Summary
+
+## 4.1 Findings
+
+This study investigated the factors that influence the frequency and economic severity of fire incidents in the City of Toronto, using a combination of fire incident data from the City’s open data portal and historical weather data from the Open-Meteo API. The analysis explored temporal, spatial, and environmental variables, and employed both statistical and machine learning models to assess their predictive power.
+
+For fire frequency, the results from GAM suggest that temperature and calendar month have strong nonlinear effects on the number of fires per month, while other factors like precipitation, wind speed, and time of day appear less influential. Seasonal effects were somewhat limited, with only spring showing a statistically significant difference relative to fall. These results highlight the importance of seasonality and weather conditions in predicting when fires are more likely to occur, with the model explaining approximately 32% of the variance in monthly fire counts.
+
+For fire severity, measured as log-transformed estimated dollar loss, a series of machine learning models were trained and compared. Among the five models tested, XGBoost model achieved the best predictive accuracy with the lowest test RMSE. Variable importance from XGBoost model revealed that temperature, log-transformed wind speed, and precipitation condition were the most influential predictors of fire-related financial loss. This reinforces the notion that environmental conditions play a key role not only in the occurrence but also the costliness of fire incidents.
+
+## 4.2 Limitations
+
+While the models provided valuable insights, several limitations should be noted. First, estimated dollar loss is a proxy for fire severity and may be subject to reporting inconsistencies. Second, the weather data was joined based on hourly alignment, which may not perfectly reflect the local conditions at the time of each fire. Third, some potentially relevant variables such as building type, fire cause, or population density were not included due to data availability. Lastly, although the models demonstrated reasonable performance, there remains substantial unexplained variability, suggesting the need for richer datasets and additional features.
+
+## 4.3 Summary
+
+In summary, this analysis shows that weather and time-based variables offer meaningful predictive power in understanding both the occurrence and severity of fire incidents. The findings could support more targeted public safety interventions, such as allocating fire prevention resources more effectively across seasons, or raising awareness during high-risk periods. Future research could extend this work by integrating more detailed spatial and structural data or by incorporating real-time weather feeds for predictive deployment.
+
+
+
+
+
+
+
+
+
+
+
+

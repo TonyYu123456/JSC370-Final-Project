@@ -1,0 +1,178 @@
+```{r include=FALSE}
+source("process_project_data.R")
+```
+
+```{r echo=FALSE}
+fire_sf <- st_as_sf(cleaned_data, coords = c("Longitude", "Latitude"), crs = 4326)
+toronto_map <- st_transform(toronto_map, crs = 4326)
+
+aggregated_data <- fire_sf %>%
+  st_join(toronto_map, join = st_within) %>%
+  group_by(AREA_NAME) %>%
+  summarise(
+    fire_count = n()
+  ) %>%
+  st_drop_geometry()
+
+toronto_map_filtered <- toronto_map %>%
+  left_join(aggregated_data, by = "AREA_NAME") %>%
+  mutate(
+    fire_count = ifelse(is.na(fire_count), 0, fire_count)
+  )
+
+map_neighborhood <- leaflet(toronto_map_filtered) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    layerId = ~AREA_NAME,
+    color = "#444444", weight = 1, smoothFactor = 0.5,
+    fillColor = ~colorNumeric("YlOrRd", domain = fire_count)(fire_count),
+    fillOpacity = 0.7,
+    label = ~paste0(
+      "Total fire incidents in ", AREA_NAME, ": ", fire_count
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2, color = "#666", fillOpacity = 0.9
+    )
+  ) %>%
+  addLegend(
+    "topright",
+    pal = colorNumeric("YlOrRd", domain = toronto_map_filtered$fire_count),
+    values = ~fire_count,
+    title = "Number of \nFire Incidents",
+    opacity = 0.7
+  ) %>%
+  setView(lng = -79.30, lat = 43.69, zoom = 10) %>%
+  addControl(
+    position = "bottomleft",
+    html = "Figure 1: This choropleth map displays the total number of fire incidents between different neighborhoods in Toronto. Darker color indicates higher incident counts and the hoverinfo shows the exact number."
+  )
+
+map_neighborhood
+```
+
+Figure 1 reveals noticeable variations in fire incident counts across different neighborhoods in Toronto. Some areas exhibit significantly higher fire incident frequencies, while others show relatively lower counts. This distribution suggests that geographic location may be an important factor influencing the occurrence of fires, potentially due to differences in population, covered area, and building density.
+
+```{r echo=FALSE}
+monthly_summary <- cleaned_data %>%
+  group_by(Month) %>%
+  summarise(
+    Incident_Count = n(),
+    Mean_Temp = mean(Temperature, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+p1 <- ggplot(monthly_summary, aes(x = Mean_Temp, y = Incident_Count, color = Month)) +
+  geom_point(size = 2) +
+  labs(
+    title = "Number of Fire Incidents vs. Mean Temperature by Month",
+    x = "Mean Temperature (°C)",
+    y = "Number of Fire Incidents",
+    color = "Month"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+ggplotly(p1, tooltip = c("x", "y", "color"), height = 600, width = 800) %>%
+  layout(
+    margin = list(b = 120),
+    annotations = list(
+      list(
+        x = 0.5,        
+        y = -0.15,      
+        text = "Figure 2: This interactive scatterplot displays the relationship between the average monthly temperature and the \n total number of fire incidents in Toronto. Each point represents one month, with colors differentiating the months.",
+        showarrow = FALSE,
+        xref = 'paper',
+        yref = 'paper',
+        xanchor = 'center',
+        yanchor = 'top',
+        font = list(size = 12)
+      )
+    )
+  )
+```
+
+Figure 2 reveals that while there is some variability in the number of fire incidents across different months, the relationship between mean temperature and incident count does not appear strictly proportional. Although a few months with higher average temperatures show increased incident counts, overall the pattern suggests that temperature alone may not be a strong predictor of fire incident frequency.
+
+```{r echo=FALSE}
+p_hist <- ggplot(cleaned_data, aes(x = Estimated_Dollar_Loss_Log, fill = DayNight)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
+  labs(
+    title = "Distribution of Fire Incidents by Log Estimated Dollar Loss",
+    x = "Log(Estimated Dollar Loss)",
+    y = "Number of Fire Incidents",
+    fill = "Day/Night"
+  ) +
+  theme_minimal()
+
+ggplotly(p_hist, tooltip = c("x", "y", "fill"), height = 600, width = 900) %>%
+  layout(
+    margin = list(b = 120),
+    annotations = list(
+      list(
+        x = 0.5,        
+        y = -0.15,      
+        text = "Figure 3: This histogram compares the distribution of fire incidents by log-transformed economic loss for incidents occurring \n during the day versus the night. It highlights potential differences in the spread and central tendencies between these two groups.",
+        showarrow = FALSE,
+        xref = 'paper',
+        yref = 'paper',
+        xanchor = 'center',
+        yanchor = 'top',
+        font = list(size = 12)
+      )
+    )
+  )
+```
+
+Figure 3 displays the distribution of fire incidents based on log-transformed estimated dollar loss. A log value of 0 indicates that the original estimated dollar loss was also 0, meaning no financial loss was reported for those incidents. In contrast, log values between 8 and 9 correspond to substantial economic losses (approximately 3000 to 8000 when back-transformed), highlighting incidents with significant financial impact. Notably, within these key ranges, incidents occurring during the day are more frequent than those at night. This pattern suggests a potential influence of time of day on the economic severity of fire events in Toronto.
+
+```{r echo=FALSE, message=FALSE}
+month_levels <- c("January", "February", "March", 
+                  "April", "May", "June", 
+                  "July", "August", "September", 
+                  "October", "November", "December")
+
+cleaned_data_ordered <- cleaned_data %>%
+  mutate(
+    Month = month(Incident_Date, label = TRUE, abbr = FALSE) %>%
+            factor(levels = month.name)
+  )
+
+freq_season_month <- cleaned_data_ordered %>%
+  group_by(Season, Month) %>%
+  summarise(Incident_Count = n()) %>%
+  ungroup()
+
+p3 <- ggplot(freq_season_month, 
+             aes(x = Season, y = Incident_Count, fill = Month,
+                 text = paste("Season:", Season,
+                              "<br>Month:", Month,
+                              "<br>Count:", Incident_Count))) +
+  geom_col(position = position_dodge()) + 
+  labs(title = "Fire Incident Frequency by Season and Month",
+       x = "Season",
+       y = "Number of Incidents") +
+  theme_minimal()
+
+ggplotly(p3, tooltip = c("x", "y", "fill"), height = 600, width = 900) %>%
+  layout(
+    margin = list(b = 120),
+    annotations = list(
+      list(
+        x = 0.5,        
+        y = -0.15,      
+        text = "Figure 4: This grouped bar chart breaks down each season into its three constituent months, \nwith bar heights showing the total number of fire incidents in Toronto for that month.",
+        showarrow = FALSE,
+        xref = 'paper',
+        yref = 'paper',
+        xanchor = 'center',
+        yanchor = 'top',
+        font = list(size = 12)
+      )
+    )
+  )
+```
+
+As shown in Figure 4, spring months exhibit the highest incident counts with a peak in May (1069), followed by summer where June leads (891), and winter where January is highest (903). Fall has the lowest fire frequency overall, with September being the quietest month (622). The grouped layout makes it easy to compare not just across seasons but also to see the month‑to‑month shifts in fire activity.
+
+
+

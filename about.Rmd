@@ -1,0 +1,54 @@
+---
+title: "About This Project"
+output: 
+    html_document:
+        toc: TRUE
+        toc_float: TRUE
+---
+
+<br>
+
+## About the Author
+
+Hello! I'm Shijun Yu, an undergraduate student majoring in data science at the University of Toronto. This project was completed as part of JSC370: Data Science II.
+
+<br>
+
+## Project Motivation
+
+Fire incidents pose significant risks to public safety and can result in substantial economic losses. Understanding when and where fires happen, and what might be contributing to their frequency and severity, is essential for prevention, preparedness, and resource planning.
+
+My initial curiosity centered around the role of weather conditions. It seemed intuitive that certain environmental factors, such as hot, dry, and windy, might be linked to a greater likelihood or severity of fires. However, after conducting preliminary analysis, I found that the relationship was not as strong as I had expected.
+
+This observation led me to expand my original focus to consider a wider range of variables, including time of day, season, and neighborhood characteristics.
+
+<br>
+
+## Data Sources
+
+Two primary datasets were used in this analysis:
+
+1. Fire incident dataset was downloaded from the City of Toronto's [Open Data Portal](https://open.toronto.ca/dataset/fire-incidents/). This dataset contains records for fire incidents within Toronto, providing comprehensive details such as the exact date and time of incident, geographical coordinates, and the estimated dollar loss incurred from each incident.
+
+2. Weather dataset was obtained using the [Open-Meteo API](https://open-meteo.com/en/docs/historical-weather-api). The Open-Meteo API provides detailed meteorological information including temperature (°C), wind speed (m/s), and precipitation (mm) at an hourly granularity.
+
+These two datasets were merged to create a comprehensive dataset from January 2011 to June 2016 for analysis.
+
+<br>
+
+## Methodology
+
+The analysis involved several key steps:
+
+1. Data cleaning and wrangling: This included handling missing values, creating new variables, and transforming skewed variables.
+
+2. Exploratory data analysis: Using visualizations to understand patterns in fire frequency and severity across different dimensions.
+
+3. Modeling: Both a Generalized Additive Model (for fire frequency) and machine learning models (for fire severity) were used to identify important predictors.
+
+For more details, please refer to the [report](report.pdf).
+
+<br>
+
+
+
