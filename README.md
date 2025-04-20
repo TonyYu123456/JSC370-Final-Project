@@ -9,5 +9,5 @@ Key components of this project include:
 - A comparison of five machine learning models (Tree, Bagging, Random Forest, Boosting, XGBoost) to predict economic loss
 - Interactive visualizations published on the website
 
-For more information on this project, please visit my website: [https://username.github.io/JSC370-finalproject](https://username.github.io/JSC370-finalproject)
+For more information on this project, please visit my website: [https://tonyyu123456.github.io/JSC370_Final_Project](https://tonyyu123456.github.io/JSC370_Final_Project)
 
